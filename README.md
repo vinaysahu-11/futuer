@@ -1,73 +1,75 @@
-# InsForge Flutter App (`futuer`)
+# InsForge Flutter App (`futuer`) — Android Edition
 
-A complete Flutter application setup integrated with **InsForge** backend cloud infrastructure for:
+A Flutter Android application integrated with **InsForge** backend cloud infrastructure for:
 1. **Authentication:** User registration (`signUp`), login (`signIn`), secure token persistence (`flutter_secure_storage`), session state listener, and sign out.
 2. **Database:** PostgREST database CRUD operations (Select, Insert, Update, Delete) against your PostgreSQL database in InsForge.
-3. **Flexible Backend Connection:** Configured so that **no dummy ID is pre-connected**. You can supply your InsForge credentials either in the configuration file or directly via the UI on startup.
+3. **Dedicated Android Configuration:** Configured exclusively for Android with `INTERNET` and `ACCESS_NETWORK_STATE` permissions enabled in `AndroidManifest.xml` and unnecessary platforms removed.
 
 ---
 
-## 🚀 How to Provide Your InsForge Credentials
+## 📱 Android Configuration Details
 
-You have two simple ways to provide your InsForge credentials:
+* **Platform Target:** Android only (`android/`)
+* **Package Name:** `com.example.futuer`
+* **Permissions in `AndroidManifest.xml`:**
+  * `android.permission.INTERNET` (enables InsForge API / backend calls)
+  * `android.permission.ACCESS_NETWORK_STATE` (network state monitoring)
+* **Secure Storage:** Uses Android Keystore and EncryptedSharedPreferences via `flutter_secure_storage`.
 
-### Option 1: In the Configuration File (Recommended for development)
-Open [`lib/config/insforge_config.dart`](file:///d:/project/futuer/lib/config/insforge_config.dart) and paste your credentials:
+---
 
-```dart
-class InsforgeConfig {
-  static const String defaultUrl = 'https://<your-project-id>.us-east.insforge.app';
-  static const String defaultAnonKey = 'your-insforge-anon-key';
-  ...
-}
-```
+## 🔗 Linked InsForge Project
 
-### Option 2: Directly inside the App UI
-Run the app. Because no ID is hardcoded, the app will show the **InsForge Backend Setup** screen:
-1. Enter your **Project URL** (e.g., `https://xyz.us-east.insforge.app`).
-2. Enter your **Public Anon Key**.
-3. Tap **Connect to InsForge**.
-4. The credentials are encrypted and stored in your device's secure keychain / storage so you don't have to enter them again.
+* **Project:** `futuer123` (`8b68b972-f8f5-4f51-a96d-cac5b84afaa6`)
+* **Account:** `projecttest1437@gmail.com`
+* **API Host:** `https://6krn5up4.us-east.insforge.app`
+* **API Key:** `ik_3039eac4f5de85011d8a2ddf076aab68`
+* **Config file:** [`lib/config/insforge_config.dart`](file:///d:/project/futuer/lib/config/insforge_config.dart)
 
 ---
 
 ## 📁 Project Architecture
 
 ```
-lib/
-├── config/
-│   └── insforge_config.dart      # Central configuration for backend URL and Anon key
-├── services/
-│   ├── insforge_service.dart     # Initializes and manages the InsForge client & secure storage
-│   ├── auth_service.dart         # Authentication operations (Sign In, Sign Up, Sign Out, Session)
-│   └── database_service.dart     # PostgREST database CRUD operations (fetch, insert, update, delete)
-├── screens/
-│   ├── connection_screen.dart    # Setup screen when no credentials are provided yet
-│   ├── auth_screen.dart          # Sign In / Sign Up tabbed authentication UI
-│   ├── home_screen.dart          # Authenticated dashboard with PostgreSQL table explorer & CRUD
-│   └── splash_gate.dart          # Dynamic router (Connection -> Auth -> Home)
-└── main.dart                     # App entry point with Material 3 styling
+futuer/
+├── android/                      # Android native project files
+│   └── app/src/main/
+│       └── AndroidManifest.xml   # Configured with Internet permissions
+├── lib/
+│   ├── config/
+│   │   └── insforge_config.dart  # InsForge backend URL & API key
+│   ├── services/
+│   │   ├── insforge_service.dart # Initializes InsForge client & secure storage
+│   │   ├── auth_service.dart     # Authentication (Sign In, Sign Up, Sign Out)
+│   │   └── database_service.dart # PostgREST database CRUD operations
+│   ├── screens/
+│   │   ├── connection_screen.dart# Setup screen to modify credentials if needed
+│   │   ├── auth_screen.dart      # Sign In / Sign Up tabbed UI
+│   │   ├── home_screen.dart      # Dashboard with PostgreSQL table explorer
+│   │   └── splash_gate.dart      # Dynamic gatekeeper routing
+│   └── main.dart                 # App entrypoint (Material 3)
+└── pubspec.yaml                  # Dependencies (insforge_flutter, etc.)
 ```
 
 ---
 
-## 🛠️ Running the Application
+## 🛠️ Running and Building for Android
 
-To run the Flutter app on your target platform (Chrome / Windows / Android / iOS):
+### 1. Run on a connected Android phone or Emulator:
+Make sure USB debugging is enabled on your Android device (or launch an emulator), then:
 
 ```bash
 flutter run
 ```
 
-Or to run specifically on Chrome / Windows:
+### 2. Build Release Android APK:
 ```bash
-flutter run -d chrome
-# or
-flutter run -d windows
+flutter build apk --release
 ```
+The APK will be generated at `build/app/outputs/flutter-apk/app-release.apk`.
 
-To run analysis or tests:
+### 3. Build Android App Bundle (for Google Play):
 ```bash
-flutter analyze
-flutter test
+flutter build appbundle --release
 ```
+The AAB will be generated at `build/app/outputs/bundle/release/app-release.aab`.
