@@ -3,7 +3,7 @@ import 'package:futuer/main.dart';
 
 void main() {
   testWidgets('App renders SplashGate without crashing', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
-    expect(find.byType(MyApp), findsOneWidget);
+    await tester.pumpWidget(const FutuerApp());
+    expect(find.byType(FutuerApp), findsOneWidget);
   });
 }
