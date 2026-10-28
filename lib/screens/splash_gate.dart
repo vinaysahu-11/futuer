@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:insforge_flutter/insforge_flutter.dart';
 import '../services/auth_service.dart';
@@ -44,6 +45,11 @@ class _SplashGateState extends State<SplashGate> {
   Future<void> _initApp() async {
     // 1. Initialize backend connection
     await InsforgeService.instance.initializeFromSavedOrConfig();
+
+    // Check for returning OAuth callback (Google Login redirect)
+    if (kIsWeb) {
+      await AuthService.instance.handleOAuthCallbackIfPresent(Uri.base);
+    }
 
     // 2. Load configured role
     await RoleService.instance.loadConfiguredRole();
