@@ -43,27 +43,31 @@ class _SplashGateState extends State<SplashGate> {
   }
 
   Future<void> _initApp() async {
-    // 1. Initialize backend connection
-    await InsforgeService.instance.initializeFromSavedOrConfig();
+    try {
+      // 1. Initialize backend connection
+      await InsforgeService.instance.initializeFromSavedOrConfig();
 
-    // Check for returning OAuth callback (Google Login redirect)
-    if (kIsWeb) {
-      await AuthService.instance.handleOAuthCallbackIfPresent(Uri.base);
-    }
+      // Check for returning OAuth callback (Google Login redirect)
+      if (kIsWeb) {
+        await AuthService.instance.handleOAuthCallbackIfPresent(Uri.base);
+      }
 
-    // 2. Load configured role
-    await RoleService.instance.loadConfiguredRole();
+      // 2. Load configured role
+      await RoleService.instance.loadConfiguredRole();
 
-    // 3. Check enrollment state for agent
-    await EnrollmentService.instance.checkEnrollment();
+      // 3. Check enrollment state for agent
+      await EnrollmentService.instance.checkEnrollment();
 
-    // 4. Subscribe to auth changes
-    _authSubscription = AuthService.instance.onAuthStateChange?.listen((_) {
-      if (mounted) setState(() {});
-    });
-
-    if (mounted) {
-      setState(() => _isInitializing = false);
+      // 4. Subscribe to auth changes
+      _authSubscription = AuthService.instance.onAuthStateChange?.listen((_) {
+        if (mounted) setState(() {});
+      });
+    } catch (e) {
+      debugPrint('Initialization error in SplashGate: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+      }
     }
   }
 

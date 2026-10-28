@@ -72,7 +72,11 @@ class InsforgeService {
         sessionStorage: SecureSessionStorage(),
       );
 
-      await newClient.restoreSession();
+      try {
+        await newClient.restoreSession();
+      } catch (e) {
+        debugPrint('Session restore skipped or failed: $e');
+      }
       _client = newClient;
 
       if (persist) {
