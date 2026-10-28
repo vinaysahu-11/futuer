@@ -1,27 +1,23 @@
 /// Configuration for InsForge Backend.
 ///
-/// By default, credentials are empty placeholders so the app does NOT connect
-/// to any dummy or unauthorized ID until you supply your credentials.
-///
-/// You can either:
-/// 1. Enter your Project URL & Anon Key in this file, OR
-/// 2. Launch the app and enter them directly on the Setup screen.
+/// Linked project: futuer123 (8b68b972-f8f5-4f51-a96d-cac5b84afaa6)
+/// Account: projecttest1437@gmail.com
 class InsforgeConfig {
   InsforgeConfig._();
 
   /// Your InsForge Project Base URL.
-  /// Example: 'https://xyz123.us-east.insforge.app'
-  /// Leave empty or set to your actual InsForge backend URL.
-  static const String defaultUrl = '';
+  static const String defaultUrl = 'https://6krn5up4.us-east.insforge.app';
 
-  /// Your InsForge Public Anonymous Key.
-  /// Leave empty or set to your actual InsForge anon key.
-  static const String defaultAnonKey = '';
+  /// Your InsForge Project API / Anon Key.
+  static const String defaultAnonKey = 'ik_3039eac4f5de85011d8a2ddf076aab68';
+
+  /// Project Identifier.
+  static const String projectId = '8b68b972-f8f5-4f51-a96d-cac5b84afaa6';
 
   /// Optional OpenRouter / AI API key if utilizing InsForge AI gateway.
   static const String defaultAiKey = '';
 
-  /// Checks if URL and Key are provided and not default placeholders.
+  /// Checks if URL and Key are provided and not empty placeholders.
   static bool isConfigured({String? url, String? anonKey}) {
     final effectiveUrl = (url ?? defaultUrl).trim();
     final effectiveKey = (anonKey ?? defaultAnonKey).trim();
