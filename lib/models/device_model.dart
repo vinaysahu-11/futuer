@@ -82,7 +82,7 @@ class DeviceModel {
     return DeviceModel(
       id: json['id'] as String,
       ownerUserId: json['owner_user_id'] as String,
-      deviceName: json['device_name'] as String? ?? 'Futuer Agent',
+      deviceName: json['device_name'] as String? ?? 'Futuer Link',
       deviceModel: json['device_model'] as String?,
       devicePlatform: json['device_platform'] as String? ?? 'android',
       pairingCode: json['pairing_code'] as String?,

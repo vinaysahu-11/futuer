@@ -6,11 +6,11 @@ import '../services/auth_service.dart';
 import '../services/enrollment_service.dart';
 import '../services/insforge_service.dart';
 import '../services/role_service.dart';
-import 'agent/home/agent_status_screen.dart';
-import 'agent/intro/agent_intro_screen.dart';
-import 'agent/pairing/agent_pairing_screen.dart';
-import 'controller/auth/controller_auth_screen.dart';
-import 'controller/dashboard/controller_dashboard_screen.dart';
+import 'link/home/link_status_screen.dart';
+import 'link/intro/link_intro_screen.dart';
+import 'link/pairing/link_pairing_screen.dart';
+import 'owner/auth/owner_auth_screen.dart';
+import 'owner/dashboard/owner_dashboard_screen.dart';
 import 'role_selection_screen.dart';
 
 class SplashGate extends StatefulWidget {
@@ -55,7 +55,7 @@ class _SplashGateState extends State<SplashGate> {
       // 2. Load configured role
       await RoleService.instance.loadConfiguredRole();
 
-      // 3. Check enrollment state for agent
+      // 3. Check enrollment state for link
       await EnrollmentService.instance.checkEnrollment();
 
       // 4. Subscribe to auth changes
@@ -90,23 +90,23 @@ class _SplashGateState extends State<SplashGate> {
       return const RoleSelectionScreen();
     }
 
-    // B: Controller Flow
-    if (role == FutuerRole.controller) {
+    // B: Futuer Owner Flow
+    if (role == FutuerRole.owner) {
       if (isAuth) {
-        return const ControllerDashboardScreen();
+        return const OwnerDashboardScreen();
       } else {
-        return const ControllerAuthScreen();
+        return const OwnerAuthScreen();
       }
     }
 
-    // C: Managed Device (Agent) Flow
-    if (role == FutuerRole.agent) {
+    // C: Futuer Link Flow
+    if (role == FutuerRole.link) {
       if (isDeviceEnrolled) {
-        return const AgentStatusScreen();
+        return const LinkStatusScreen();
       } else if (isAuth) {
-        return const AgentPairingScreen();
+        return const LinkPairingScreen();
       } else {
-        return const AgentIntroScreen();
+        return const LinkIntroScreen();
       }
     }
 

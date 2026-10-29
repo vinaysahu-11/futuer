@@ -63,11 +63,11 @@ class AuthService {
     // 2. Persist verifier securely to exchange once callback returns
     await _storage.write(key: _keyPkceVerifier, value: verifier);
 
-    // 3. Determine redirect URI: use origin on web (e.g. http://localhost:port/)
+    // 3. Determine redirect URI: use origin on web, and custom app scheme on Android
     final redirect = customRedirectUri ??
         (kIsWeb
             ? '${Uri.base.scheme}://${Uri.base.host}${Uri.base.hasPort ? ':${Uri.base.port}' : ''}/'
-            : 'http://localhost:3000/callback');
+            : 'futuer://callback');
 
     // 4. Request Google authorization URL from InsForge
     final authUrl = await _client.auth.getOAuthUrl(

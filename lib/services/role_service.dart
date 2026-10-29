@@ -5,8 +5,8 @@ import 'enrollment_service.dart';
 
 enum FutuerRole {
   none,
-  controller,
-  agent,
+  owner, // Futuer Owner (controls and manages enrolled devices)
+  link,  // Futuer Link (device that is enrolled and managed by an authorized Owner)
 }
 
 class RoleService {
@@ -20,17 +20,21 @@ class RoleService {
 
   FutuerRole get currentRole => currentRoleNotifier.value;
   bool get hasRole => currentRole != FutuerRole.none;
-  bool get isController => currentRole == FutuerRole.controller;
-  bool get isAgent => currentRole == FutuerRole.agent;
+  bool get isOwner => currentRole == FutuerRole.owner;
+  bool get isLink => currentRole == FutuerRole.link;
 
-  /// Loads the stored role from secure storage
+  // Legacy aliases for backward compatibility during refactoring
+  bool get isController => isOwner;
+  bool get isAgent => isLink;
+
+  /// Loads the stored role from secure storage (handles legacy stored values)
   Future<FutuerRole> loadConfiguredRole() async {
     try {
       final roleStr = await _storage.read(key: _keyConfiguredRole);
-      if (roleStr == 'controller') {
-        currentRoleNotifier.value = FutuerRole.controller;
-      } else if (roleStr == 'agent') {
-        currentRoleNotifier.value = FutuerRole.agent;
+      if (roleStr == 'owner' || roleStr == 'controller') {
+        currentRoleNotifier.value = FutuerRole.owner;
+      } else if (roleStr == 'link' || roleStr == 'agent') {
+        currentRoleNotifier.value = FutuerRole.link;
       } else {
         currentRoleNotifier.value = FutuerRole.none;
       }
@@ -44,10 +48,10 @@ class RoleService {
   /// Sets and persists the configured role
   Future<void> setConfiguredRole(FutuerRole role) async {
     currentRoleNotifier.value = role;
-    if (role == FutuerRole.controller) {
-      await _storage.write(key: _keyConfiguredRole, value: 'controller');
-    } else if (role == FutuerRole.agent) {
-      await _storage.write(key: _keyConfiguredRole, value: 'agent');
+    if (role == FutuerRole.owner) {
+      await _storage.write(key: _keyConfiguredRole, value: 'owner');
+    } else if (role == FutuerRole.link) {
+      await _storage.write(key: _keyConfiguredRole, value: 'link');
     } else {
       await _storage.delete(key: _keyConfiguredRole);
     }

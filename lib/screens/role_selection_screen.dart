@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/role_service.dart';
-import 'controller/auth/controller_auth_screen.dart';
-import 'agent/intro/agent_intro_screen.dart';
+import 'link/intro/link_intro_screen.dart';
+import 'owner/auth/owner_auth_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
 
-  void _selectController(BuildContext context) async {
-    await RoleService.instance.setConfiguredRole(FutuerRole.controller);
+  void _selectOwner(BuildContext context) async {
+    await RoleService.instance.setConfiguredRole(FutuerRole.owner);
     if (!context.mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const ControllerAuthScreen()),
+      MaterialPageRoute(builder: (_) => const OwnerAuthScreen()),
     );
   }
 
-  void _selectAgent(BuildContext context) async {
-    // Note: Do not permanently mark role as agent until enrollment or user completes intro
+  void _selectLink(BuildContext context) async {
     if (!context.mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const AgentIntroScreen()),
+      MaterialPageRoute(builder: (_) => const LinkIntroScreen()),
     );
   }
 
@@ -85,30 +84,30 @@ class RoleSelectionScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 36),
 
-                  // Option A: Controller Card
+                  // Option A: Futuer Owner Card
                   _RoleCard(
-                    title: 'Controller',
+                    title: 'Futuer Owner',
                     badgeText: 'Option A',
                     badgeColor: FutuerTheme.brandSecondary,
-                    description: 'Manage your own enrolled device.',
+                    description: 'Manage and monitor all your enrolled devices from this phone.',
                     icon: Icons.admin_panel_settings_outlined,
-                    buttonLabel: 'Continue as Controller',
+                    buttonLabel: 'Continue as Owner',
                     buttonColor: FutuerTheme.brandSecondary,
-                    onPressed: () => _selectController(context),
+                    onPressed: () => _selectOwner(context),
                   ),
 
                   const SizedBox(height: 20),
 
-                  // Option B: Managed Device Card
+                  // Option B: Futuer Link Card
                   _RoleCard(
-                    title: 'Managed Device',
+                    title: 'Futuer Link',
                     badgeText: 'Option B',
                     badgeColor: FutuerTheme.brandPrimary,
-                    description: 'Register this phone to an authorized Futuer Controller.',
+                    description: 'Set up this phone to link to an authorized Futuer Owner.',
                     icon: Icons.phonelink_setup_rounded,
-                    buttonLabel: 'Connect This Device',
+                    buttonLabel: 'Set Up This Device',
                     buttonColor: const Color(0xFF00B0FF),
-                    onPressed: () => _selectAgent(context),
+                    onPressed: () => _selectLink(context),
                   ),
 
                   const SizedBox(height: 32),

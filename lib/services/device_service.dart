@@ -233,7 +233,28 @@ class DeviceService {
         .execute();
   }
 
-  /// Revokes an enrolled device
+  /// Renames an enrolled device belonging to this owner
+  Future<void> renameDevice(String deviceId, String newName) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) throw ArgumentError('Device name cannot be empty');
+
+    await _insforge.client.database
+        .from('devices')
+        .eq('id', deviceId)
+        .update({
+          'device_name': trimmed,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .execute();
+
+    await AuditService.instance.log(
+      action: 'DEVICE_RENAMED',
+      result: 'SUCCESS',
+      deviceId: deviceId,
+    );
+  }
+
+  /// Revokes an enrolled device (unlinks from owner)
   Future<void> revokeDevice(String deviceId) async {
     await _insforge.client.database
         .from('devices')
