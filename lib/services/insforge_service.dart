@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:insforge_flutter/insforge_flutter.dart';
 import '../config/insforge_config.dart';
+import 'safe_session_storage.dart';
 
 /// Central service responsible for initializing and managing the InsForge backend connection.
 class InsforgeService {
@@ -78,7 +79,7 @@ class InsforgeService {
       final newClient = InsforgeClient(
         sanitizedUrl,
         anonKey.trim(),
-        sessionStorage: SecureSessionStorage(),
+        sessionStorage: SafeSessionStorage(),
       );
 
       try {

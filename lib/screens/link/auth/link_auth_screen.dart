@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:insforge_flutter/insforge_flutter.dart';
 import '../../../config/theme.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/role_service.dart';
+import '../../splash_gate.dart';
 import '../pairing/link_pairing_screen.dart';
 
 class LinkAuthScreen extends StatefulWidget {
@@ -19,9 +22,25 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSub = AuthService.instance.onAuthStateChange?.listen((event) {
+      if (AuthService.instance.isAuthenticated && mounted) {
+        RoleService.instance.setConfiguredRole(FutuerRole.link);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LinkPairingScreen()),
+          (route) => false,
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -121,6 +140,18 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Futuer Link Device Setup'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const SplashGate()),
+              );
+            }
+          },
+        ),
       ),
       body: SafeArea(
         child: Center(

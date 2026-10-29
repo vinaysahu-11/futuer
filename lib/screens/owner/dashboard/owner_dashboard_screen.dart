@@ -6,7 +6,7 @@ import '../../../models/device_model.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/device_service.dart';
 import '../../../services/role_service.dart';
-import '../../role_selection_screen.dart';
+import '../../splash_gate.dart';
 import '../device_details/owner_device_details_screen.dart';
 import '../pairing/owner_pairing_screen.dart';
 
@@ -195,7 +195,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           FilledButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
-              await AuthService.instance.signOut();
+              _pollingTimer?.cancel();
+              await RoleService.instance.resetRole();
+              if (!mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const SplashGate()),
+                (route) => false,
+              );
             },
             child: const Text('Sign Out'),
           ),
@@ -217,10 +223,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           FilledButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
+              _pollingTimer?.cancel();
               await RoleService.instance.resetRole();
               if (!mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+                MaterialPageRoute(builder: (_) => const SplashGate()),
                 (route) => false,
               );
             },

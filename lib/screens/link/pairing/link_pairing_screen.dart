@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../config/theme.dart';
 import '../../../models/pairing_request.dart';
 import '../../../services/enrollment_service.dart';
+import '../../splash_gate.dart';
 import '../permissions/link_permissions_screen.dart';
 
 class LinkPairingScreen extends StatefulWidget {
@@ -178,6 +179,18 @@ class _LinkPairingScreenState extends State<LinkPairingScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pair Device with Owner'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const SplashGate()),
+              );
+            }
+          },
+        ),
       ),
       body: SafeArea(
         child: Center(

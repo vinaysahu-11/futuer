@@ -9,7 +9,7 @@ import '../../../services/location_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/role_service.dart';
 import '../../../services/session_listener_service.dart';
-import '../../role_selection_screen.dart';
+import '../../splash_gate.dart';
 import '../permissions/link_permissions_screen.dart';
 import '../session/link_active_session_screen.dart';
 
@@ -149,7 +149,7 @@ class _LinkStatusScreenState extends State<LinkStatusScreen> {
               await RoleService.instance.resetRole();
               if (!mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+                MaterialPageRoute(builder: (_) => const SplashGate()),
                 (route) => false,
               );
             },

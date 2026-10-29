@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../../config/theme.dart';
+import '../../splash_gate.dart';
 import '../auth/link_auth_screen.dart';
 
 class LinkIntroScreen extends StatelessWidget {
   const LinkIntroScreen({super.key});
+
+  void _navigateBack(BuildContext context) {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const SplashGate()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +26,7 @@ class LinkIntroScreen extends StatelessWidget {
         title: const Text('Set Up Futuer Link'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => _navigateBack(context),
         ),
       ),
       body: SafeArea(
@@ -118,7 +129,7 @@ class LinkIntroScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => _navigateBack(context),
                     child: const Text('Cancel / Change Role'),
                   ),
                 ],

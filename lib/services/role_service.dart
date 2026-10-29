@@ -76,15 +76,33 @@ class RoleService {
 
   /// Safely clears the role, signing out and clearing device credentials
   Future<void> resetRole() async {
-    currentRoleNotifier.value = FutuerRole.none;
     try {
-      await AuthService.instance.signOut();
-      await EnrollmentService.instance.unpair();
+      await AuthService.instance.signOut().timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => debugPrint('SignOut timed out safely'),
+          );
+    } catch (e) {
+      debugPrint('Auth signOut error: $e');
+    }
+
+    try {
+      await EnrollmentService.instance.unpair().timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => debugPrint('Unpair timed out safely'),
+          );
+    } catch (e) {
+      debugPrint('Enrollment unpair error: $e');
+    }
+
+    try {
       await _storage
           .delete(key: _keyConfiguredRole)
           .timeout(const Duration(seconds: 2), onTimeout: () {});
     } catch (e) {
-      debugPrint('Error resetting role: $e');
+      debugPrint('Role delete error: $e');
     }
+
+    // Notify listeners only after all auth and enrollment states are cleanly cleared
+    currentRoleNotifier.value = FutuerRole.none;
   }
 }

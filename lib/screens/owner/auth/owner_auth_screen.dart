@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:insforge_flutter/insforge_flutter.dart';
 import '../../../config/theme.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/role_service.dart';
-import '../../role_selection_screen.dart';
+import '../../splash_gate.dart';
 import '../dashboard/owner_dashboard_screen.dart';
 
 class OwnerAuthScreen extends StatefulWidget {
@@ -23,9 +25,25 @@ class _OwnerAuthScreenState extends State<OwnerAuthScreen> {
   bool _obscurePassword = true;
   String? _errorMessage;
   String? _successMessage;
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSub = AuthService.instance.onAuthStateChange?.listen((event) {
+      if (AuthService.instance.isAuthenticated && mounted) {
+        RoleService.instance.setConfiguredRole(FutuerRole.owner);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const OwnerDashboardScreen()),
+          (route) => false,
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
@@ -139,7 +157,7 @@ class _OwnerAuthScreenState extends State<OwnerAuthScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+              MaterialPageRoute(builder: (_) => const SplashGate()),
             );
           },
         ),

@@ -10,12 +10,13 @@ class RoleSelectionScreen extends StatelessWidget {
   void _selectOwner(BuildContext context) async {
     await RoleService.instance.setConfiguredRole(FutuerRole.owner);
     if (!context.mounted) return;
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const OwnerAuthScreen()),
     );
   }
 
   void _selectLink(BuildContext context) async {
+    await RoleService.instance.setConfiguredRole(FutuerRole.link);
     if (!context.mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const LinkIntroScreen()),

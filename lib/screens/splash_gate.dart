@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:insforge_flutter/insforge_flutter.dart';
@@ -23,6 +24,8 @@ class SplashGate extends StatefulWidget {
 class _SplashGateState extends State<SplashGate> {
   bool _isInitializing = true;
   StreamSubscription<AuthState>? _authSubscription;
+  AppLinks? _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
@@ -35,6 +38,7 @@ class _SplashGateState extends State<SplashGate> {
   void dispose() {
     RoleService.instance.currentRoleNotifier.removeListener(_onStateChanged);
     _authSubscription?.cancel();
+    _linkSubscription?.cancel();
     super.dispose();
   }
 
@@ -53,6 +57,28 @@ class _SplashGateState extends State<SplashGate> {
         if (exchanged) {
           debugPrint('Google OAuth callback processed successfully.');
         }
+      } else {
+        _appLinks = AppLinks();
+        // Check if app was launched via deep link
+        try {
+          final initialUri = await _appLinks!.getInitialLink();
+          if (initialUri != null) {
+            final exchanged = await AuthService.instance.handleOAuthCallbackIfPresent(initialUri);
+            if (exchanged && mounted) {
+              setState(() {});
+            }
+          }
+        } catch (e) {
+          debugPrint('AppLinks initial link note: $e');
+        }
+
+        // Listen for incoming deep links while app is running
+        _linkSubscription = _appLinks!.uriLinkStream.listen((uri) async {
+          final exchanged = await AuthService.instance.handleOAuthCallbackIfPresent(uri);
+          if (exchanged && mounted) {
+            setState(() {});
+          }
+        });
       }
 
       // 2. Load configured role
