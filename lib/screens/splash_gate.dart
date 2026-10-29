@@ -49,14 +49,27 @@ class _SplashGateState extends State<SplashGate> {
 
       // Check for returning OAuth callback (Google Login redirect)
       if (kIsWeb) {
-        await AuthService.instance.handleOAuthCallbackIfPresent(Uri.base);
+        final exchanged = await AuthService.instance.handleOAuthCallbackIfPresent(Uri.base);
+        if (exchanged) {
+          debugPrint('Google OAuth callback processed successfully.');
+        }
       }
 
       // 2. Load configured role
-      await RoleService.instance.loadConfiguredRole();
+      var role = await RoleService.instance.loadConfiguredRole();
 
       // 3. Check enrollment state for link
       await EnrollmentService.instance.checkEnrollment();
+
+      // Ensure authenticated user never gets stranded on role selection
+      if (AuthService.instance.isAuthenticated && role == FutuerRole.none) {
+        if (EnrollmentService.instance.cachedDeviceId != null) {
+          await RoleService.instance.setConfiguredRole(FutuerRole.link);
+        } else {
+          // An authenticated user logging in via Google/Email without existing link enrollment is an Owner
+          await RoleService.instance.setConfiguredRole(FutuerRole.owner);
+        }
+      }
 
       // 4. Subscribe to auth changes
       _authSubscription = AuthService.instance.onAuthStateChange?.listen((_) {
@@ -85,31 +98,29 @@ class _SplashGateState extends State<SplashGate> {
     final isAuth = AuthService.instance.isAuthenticated;
     final isDeviceEnrolled = EnrollmentService.instance.cachedDeviceId != null;
 
-    // A: No role configured yet -> Show Welcome & Role Selection
-    if (role == FutuerRole.none) {
-      return const RoleSelectionScreen();
+    // A: Enrolled Link device always goes directly to Link Status Screen
+    if (isDeviceEnrolled) {
+      return const LinkStatusScreen();
     }
 
-    // B: Futuer Owner Flow
-    if (role == FutuerRole.owner) {
-      if (isAuth) {
-        return const OwnerDashboardScreen();
-      } else {
-        return const OwnerAuthScreen();
-      }
-    }
-
-    // C: Futuer Link Flow
-    if (role == FutuerRole.link) {
-      if (isDeviceEnrolled) {
-        return const LinkStatusScreen();
-      } else if (isAuth) {
+    // B: Authenticated User routing
+    if (isAuth) {
+      if (role == FutuerRole.link) {
         return const LinkPairingScreen();
-      } else {
-        return const LinkIntroScreen();
       }
+      // Any authenticated user not enrolled as link device opens Owner Dashboard
+      return const OwnerDashboardScreen();
     }
 
+    // C: Unauthenticated configured roles
+    if (role == FutuerRole.owner) {
+      return const OwnerAuthScreen();
+    }
+    if (role == FutuerRole.link) {
+      return const LinkIntroScreen();
+    }
+
+    // D: Default to Role Selection (Welcome Screen)
     return const RoleSelectionScreen();
   }
 }

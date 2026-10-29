@@ -3,6 +3,7 @@ import '../../../config/theme.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/role_service.dart';
 import '../../role_selection_screen.dart';
+import '../dashboard/owner_dashboard_screen.dart';
 
 class OwnerAuthScreen extends StatefulWidget {
   const OwnerAuthScreen({super.key});
@@ -56,17 +57,24 @@ class _OwnerAuthScreenState extends State<OwnerAuthScreen> {
           password: _passwordController.text,
         );
         await RoleService.instance.setConfiguredRole(FutuerRole.owner);
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const OwnerDashboardScreen()),
+          );
+        }
       } else if (_modeIndex == 1) {
-        // Create Account
+        // Create Account — auto-verifies and auto signs in
         await AuthService.instance.signUp(
           email: _emailController.text,
           password: _passwordController.text,
           name: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
         );
         await RoleService.instance.setConfiguredRole(FutuerRole.owner);
-        setState(() {
-          _successMessage = 'Account created successfully! You are now signed in.';
-        });
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const OwnerDashboardScreen()),
+          );
+        }
       } else {
         // Forgot Password
         setState(() {
@@ -76,7 +84,7 @@ class _OwnerAuthScreenState extends State<OwnerAuthScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+          _errorMessage = e.toString().replaceAll('Exception:', '').replaceAll('InsforgeAuthException:', '').trim();
         });
       }
     } finally {
@@ -92,7 +100,7 @@ class _OwnerAuthScreenState extends State<OwnerAuthScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
-      _successMessage = null;
+      _successMessage = 'Connecting with Google...';
     });
 
     try {
@@ -102,12 +110,8 @@ class _OwnerAuthScreenState extends State<OwnerAuthScreen> {
       if (mounted) {
         setState(() {
           _errorMessage = e.toString().replaceAll('Exception:', '').trim();
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
           _isLoading = false;
+          _successMessage = null;
         });
       }
     }
@@ -141,20 +145,32 @@ class _OwnerAuthScreenState extends State<OwnerAuthScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Header
+                    // Brand Logo
                     Center(
                       child: Container(
-                        width: 64,
-                        height: 64,
+                        width: 72,
+                        height: 72,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [FutuerTheme.brandSecondary, Color(0xFF00B0FF)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                              blurRadius: 18,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.security, size: 34, color: Colors.white),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Image.asset(
+                            'assets/images/futuer_logo.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: const Color(0xFF0B1120),
+                              child: const Icon(Icons.security, size: 36, color: Color(0xFF00E5FF)),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -239,18 +255,18 @@ class _OwnerAuthScreenState extends State<OwnerAuthScreen> {
                         padding: const EdgeInsets.all(12),
                         margin: const EdgeInsets.only(bottom: 16),
                         decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
+                          color: Colors.blue.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                          border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
+                            const Icon(Icons.info_outline, color: Colors.blue, size: 20),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 _successMessage!,
-                                style: const TextStyle(color: Colors.green, fontSize: 13),
+                                style: const TextStyle(color: Colors.blue, fontSize: 13),
                               ),
                             ),
                           ],
@@ -339,7 +355,7 @@ class _OwnerAuthScreenState extends State<OwnerAuthScreen> {
                                 _modeIndex == 0
                                     ? 'Sign In as Owner'
                                     : _modeIndex == 1
-                                        ? 'Create Account'
+                                        ? 'Create Account & Enter'
                                         : 'Send Recovery Email',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                               ),

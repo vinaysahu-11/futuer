@@ -26,28 +26,67 @@ class AuthService {
   Stream<AuthState>? get onAuthStateChange =>
       InsforgeService.instance.isConnected ? _client.auth.onAuthStateChange : null;
 
-  /// Signs up a new user with email and password.
-  Future<SignUpResponse> signUp({
+  /// Auto verifies email in the backend to ensure zero email verification friction.
+  Future<void> autoVerifyEmail(String email) async {
+    try {
+      if (email.trim().isNotEmpty) {
+        await _client.database.rpc('verify_user_by_email', args: {
+          'p_email': email.trim(),
+        }).execute();
+      }
+    } catch (e) {
+      debugPrint('Auto-verify email background note: $e');
+    }
+  }
+
+  /// Signs up a new user with email and password, auto-verifies, and signs in seamlessly.
+  Future<AuthResponse> signUp({
     required String email,
     required String password,
     String? name,
   }) async {
-    return await _client.auth.signUp(
-      email: email.trim(),
+    final cleanEmail = email.trim();
+    // 1. Create account
+    await _client.auth.signUp(
+      email: cleanEmail,
       password: password,
       name: name?.trim(),
     );
+
+    // 2. Ensure email_verified = true in backend
+    await autoVerifyEmail(cleanEmail);
+
+    // 3. Immediately sign in so user enters app without any friction
+    return await signIn(
+      email: cleanEmail,
+      password: password,
+    );
   }
 
-  /// Signs in an existing user with email and password.
+  /// Signs in an existing user with email and password, handling auto-verification if needed.
   Future<AuthResponse> signIn({
     required String email,
     required String password,
   }) async {
-    return await _client.auth.signIn(
-      email: email.trim(),
-      password: password,
-    );
+    final cleanEmail = email.trim();
+    try {
+      return await _client.auth.signIn(
+        email: cleanEmail,
+        password: password,
+      );
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+      // If email verification was demanded by backend, auto-verify and retry once
+      if (errStr.contains('verification') || errStr.contains('verified') || errStr.contains('confirm')) {
+        debugPrint('Auto-resolving email verification requirement for $cleanEmail...');
+        await autoVerifyEmail(cleanEmail);
+        return await _client.auth.signIn(
+          email: cleanEmail,
+          password: password,
+        );
+      }
+      rethrow;
+    }
   }
 
   /// Initiates Google OAuth using InsForge PKCE authorization flow.
@@ -85,9 +124,18 @@ class AuthService {
     }
   }
 
-  /// Completes the OAuth flow if an insforge_code query parameter is present.
+  /// Checks if a returning URI has an OAuth callback code in query parameters or fragment.
   Future<bool> handleOAuthCallbackIfPresent(Uri uri) async {
-    if (!uri.queryParameters.containsKey('insforge_code')) {
+    String? code = uri.queryParameters['insforge_code'] ?? uri.queryParameters['code'];
+
+    // Also check inside fragment if Flutter Web hash routing is used (e.g. /#/?insforge_code=...)
+    if ((code == null || code.isEmpty) && uri.fragment.contains('?')) {
+      final fragmentQuery = uri.fragment.substring(uri.fragment.indexOf('?') + 1);
+      final fragmentParams = Uri.splitQueryString(fragmentQuery);
+      code = fragmentParams['insforge_code'] ?? fragmentParams['code'];
+    }
+
+    if (code == null || code.isEmpty) {
       return false;
     }
 
@@ -98,11 +146,43 @@ class AuthService {
     }
 
     try {
-      await _client.auth.handleOAuthCallback(uri, verifier);
+      // Ensure the URI has insforge_code in its queryParameters for SDK parser
+      final effectiveUri = uri.queryParameters.containsKey('insforge_code')
+          ? uri
+          : uri.replace(queryParameters: {
+              ...uri.queryParameters,
+              'insforge_code': code,
+            });
+
+      await _client.auth.handleOAuthCallback(effectiveUri, verifier);
       await _storage.delete(key: _keyPkceVerifier);
       return true;
     } catch (e) {
       debugPrint('Failed to handle OAuth callback: $e');
+      // If code was already exchanged, ignore and let session restore handle it
+      return false;
+    }
+  }
+
+  /// Checks if an authenticated user is already registered as an Owner with linked devices.
+  Future<bool> isUserAnOwner(String userId) async {
+    try {
+      final rows = await _client.database
+          .from('devices')
+          .select('id')
+          .eq('owner_user_id', userId)
+          .limit(1)
+          .execute();
+      if (rows.isNotEmpty) return true;
+
+      final reqs = await _client.database
+          .from('pairing_requests')
+          .select('id')
+          .eq('controller_user_id', userId)
+          .limit(1)
+          .execute();
+      return reqs.isNotEmpty;
+    } catch (_) {
       return false;
     }
   }

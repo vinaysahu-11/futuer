@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../config/theme.dart';
 import '../../../models/pairing_request.dart';
+import '../../../services/auth_service.dart';
 import '../../../services/enrollment_service.dart';
 import '../permissions/link_permissions_screen.dart';
 
@@ -35,8 +36,16 @@ class _LinkPairingScreenState extends State<LinkPairingScreen> {
     });
 
     try {
-      // 1-5. Format validation, trusted backend verification, expiration & single-use check
+      // 1-5. Format validation, backend verification, expiration & single-use check
       final req = await EnrollmentService.instance.lookupPairingCode(code);
+
+      // Prevent Owner from enrolling their own primary account as a secondary Link device
+      final currentUserId = AuthService.instance.currentUser?.id;
+      if (currentUserId != null && currentUserId == req.controllerUserId) {
+        throw StateError(
+          'Cannot pair device: You are signed into the Owner account on this phone. An Owner manages enrolled devices and cannot enroll this phone as its own secondary Link device. Open this app on your secondary phone to pair.',
+        );
+      }
 
       if (!mounted) return;
 
@@ -146,7 +155,6 @@ class _LinkPairingScreenState extends State<LinkPairingScreen> {
       );
 
       if (mounted) {
-        // Navigate to permissions setup
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const LinkPermissionsScreen()),
         );
@@ -184,16 +192,28 @@ class _LinkPairingScreenState extends State<LinkPairingScreen> {
                 children: [
                   Center(
                     child: Container(
-                      width: 60,
-                      height: 60,
+                      width: 68,
+                      height: 68,
                       decoration: BoxDecoration(
-                        color: FutuerTheme.brandPrimary.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.qr_code_2_rounded,
-                        size: 32,
-                        color: FutuerTheme.brandPrimary,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.asset(
+                          'assets/images/futuer_logo.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFF0B1120),
+                            child: const Icon(Icons.qr_code_2_rounded, size: 34, color: Color(0xFF00E5FF)),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -274,7 +294,7 @@ class _LinkPairingScreenState extends State<LinkPairingScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
                         : const Text(
-                            'Verify Code',
+                            'Verify & Link Device',
                             style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                           ),
                   ),

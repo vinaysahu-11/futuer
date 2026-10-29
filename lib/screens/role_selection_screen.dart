@@ -41,27 +41,32 @@ class RoleSelectionScreen extends StatelessWidget {
                   // Futuer Logo & Header
                   Center(
                     child: Container(
-                      width: 72,
-                      height: 72,
+                      width: 80,
+                      height: 80,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [FutuerTheme.brandPrimary, FutuerTheme.brandSecondary],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: FutuerTheme.brandPrimary.withValues(alpha: 0.35),
-                            blurRadius: 18,
+                            color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                            blurRadius: 20,
                             offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.device_hub_rounded,
-                        size: 40,
-                        color: Colors.white,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.asset(
+                          'assets/images/futuer_logo.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFF0B1120),
+                            child: const Icon(
+                              Icons.device_hub_rounded,
+                              size: 40,
+                              color: Color(0xFF00E5FF),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

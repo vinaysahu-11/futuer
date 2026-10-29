@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../config/theme.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/role_service.dart';
 import '../pairing/link_pairing_screen.dart';
 
 class LinkAuthScreen extends StatefulWidget {
@@ -26,6 +27,19 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
     super.dispose();
   }
 
+  Future<void> _checkOwnerRestriction() async {
+    final user = AuthService.instance.currentUser;
+    if (user != null) {
+      final isOwner = await AuthService.instance.isUserAnOwner(user.id);
+      if (isOwner) {
+        await AuthService.instance.signOut();
+        throw StateError(
+          'Owner Account Detected: This account is registered as a Futuer Owner. An Owner account cannot be enrolled as a managed Link device. Please use a separate account on this phone.',
+        );
+      }
+    }
+  }
+
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -44,9 +58,12 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
         await AuthService.instance.signUp(
           email: _emailController.text,
           password: _passwordController.text,
-          name: 'Futuer Link User',
+          name: 'Futuer Link Device User',
         );
       }
+
+      await _checkOwnerRestriction();
+      await RoleService.instance.setConfiguredRole(FutuerRole.link);
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -56,7 +73,7 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+          _errorMessage = e.toString().replaceAll('Exception:', '').replaceAll('StateError:', '').trim();
         });
       }
     } finally {
@@ -75,6 +92,7 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
     });
 
     try {
+      await RoleService.instance.setConfiguredRole(FutuerRole.link);
       await AuthService.instance.signInWithGoogle();
     } catch (e) {
       if (mounted) {
@@ -86,6 +104,14 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
     }
   }
 
+  void _proceedDirectToPairing() async {
+    await RoleService.instance.setConfiguredRole(FutuerRole.link);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const LinkPairingScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -93,12 +119,12 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Futuer Link Sign In'),
+        title: const Text('Futuer Link Device Setup'),
       ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 440),
               child: Form(
@@ -106,21 +132,126 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Brand Logo
+                    Center(
+                      child: Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00B0FF).withValues(alpha: 0.25),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.asset(
+                            'assets/images/futuer_logo.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: const Color(0xFF0B1120),
+                              child: const Icon(Icons.phonelink_setup_rounded, size: 34, color: Color(0xFF00B0FF)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Text(
-                      _modeIndex == 0 ? 'Authenticate This Device' : 'Create Device Account',
+                      'Link This Phone',
                       style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
-                      'Sign in before entering the one-time pairing code provided by your Futuer Owner.',
+                      'You can pair this phone directly using the 6-digit code from the Owner, or authenticate below.',
                       style: TextStyle(
                         fontSize: 13,
                         color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
+
+                    // Quick Pair Option (Recommended - No separate account required!)
+                    Card(
+                      elevation: 0,
+                      color: isDark
+                          ? FutuerTheme.brandPrimary.withValues(alpha: 0.12)
+                          : FutuerTheme.brandPrimary.withValues(alpha: 0.08),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(
+                          color: FutuerTheme.brandPrimary.withValues(alpha: 0.35),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.flash_on, color: FutuerTheme.brandPrimary, size: 24),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Quick Pair (Recommended)',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: FutuerTheme.brandPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'No separate account needed. Enter the one-time pairing code from the Owner to link this device instantly.',
+                              style: TextStyle(fontSize: 12, height: 1.3),
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: FutuerTheme.brandPrimaryDark,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                onPressed: _proceedDirectToPairing,
+                                icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                                label: const Text('Enter Pairing Code Now'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(child: Divider(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Text(
+                            'OR SIGN IN WITH ACCOUNT',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
 
                     if (_errorMessage != null)
                       Container(
@@ -131,9 +262,17 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                         ),
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.red, fontSize: 13),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(color: Colors.red, fontSize: 12.5),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
@@ -146,7 +285,7 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
                       ),
                       validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
                     TextFormField(
                       controller: _passwordController,
@@ -161,12 +300,12 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
                       ),
                       validator: (v) => (v == null || v.length < 6) ? 'Password must be 6+ chars' : null,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
                     FilledButton(
                       style: FilledButton.styleFrom(
-                        backgroundColor: FutuerTheme.brandPrimaryDark,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: const Color(0xFF00B0FF),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: _isLoading ? null : _handleSubmit,
@@ -176,14 +315,14 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : Text(_modeIndex == 0 ? 'Continue to Pairing' : 'Register & Continue'),
+                          : Text(_modeIndex == 0 ? 'Sign In & Pair' : 'Register & Pair'),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
                     // Google OAuth Button
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         side: BorderSide(
                           color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
@@ -199,17 +338,18 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
                       ),
                       label: const Text(
                         'Continue with Google',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                       ),
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     TextButton(
                       onPressed: () => setState(() => _modeIndex = _modeIndex == 0 ? 1 : 0),
                       child: Text(
                         _modeIndex == 0
                             ? "Don't have an account? Register"
                             : "Already have an account? Sign In",
+                        style: const TextStyle(fontSize: 12),
                       ),
                     ),
                   ],
