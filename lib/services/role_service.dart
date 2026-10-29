@@ -13,7 +13,12 @@ class RoleService {
   RoleService._();
   static final RoleService instance = RoleService._();
 
-  static const _storage = FlutterSecureStorage();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+    ),
+  );
   static const String _keyConfiguredRole = 'futuer_configured_role';
 
   final ValueNotifier<FutuerRole> currentRoleNotifier = ValueNotifier<FutuerRole>(FutuerRole.none);
@@ -27,10 +32,12 @@ class RoleService {
   bool get isController => isOwner;
   bool get isAgent => isLink;
 
-  /// Loads the stored role from secure storage (handles legacy stored values)
+  /// Loads the stored role from secure storage with safe timeout
   Future<FutuerRole> loadConfiguredRole() async {
     try {
-      final roleStr = await _storage.read(key: _keyConfiguredRole);
+      final roleStr = await _storage
+          .read(key: _keyConfiguredRole)
+          .timeout(const Duration(seconds: 2), onTimeout: () => null);
       if (roleStr == 'owner' || roleStr == 'controller') {
         currentRoleNotifier.value = FutuerRole.owner;
       } else if (roleStr == 'link' || roleStr == 'agent') {
@@ -45,28 +52,39 @@ class RoleService {
     return currentRoleNotifier.value;
   }
 
-  /// Sets and persists the configured role
+  /// Sets and persists the configured role immediately in memory, then writes to storage with safe timeout
   Future<void> setConfiguredRole(FutuerRole role) async {
     currentRoleNotifier.value = role;
-    if (role == FutuerRole.owner) {
-      await _storage.write(key: _keyConfiguredRole, value: 'owner');
-    } else if (role == FutuerRole.link) {
-      await _storage.write(key: _keyConfiguredRole, value: 'link');
-    } else {
-      await _storage.delete(key: _keyConfiguredRole);
+    try {
+      if (role == FutuerRole.owner) {
+        await _storage
+            .write(key: _keyConfiguredRole, value: 'owner')
+            .timeout(const Duration(seconds: 2), onTimeout: () {});
+      } else if (role == FutuerRole.link) {
+        await _storage
+            .write(key: _keyConfiguredRole, value: 'link')
+            .timeout(const Duration(seconds: 2), onTimeout: () {});
+      } else {
+        await _storage
+            .delete(key: _keyConfiguredRole)
+            .timeout(const Duration(seconds: 2), onTimeout: () {});
+      }
+    } catch (e) {
+      debugPrint('Warning: Failed to persist configured role: $e');
     }
   }
 
   /// Safely clears the role, signing out and clearing device credentials
   Future<void> resetRole() async {
+    currentRoleNotifier.value = FutuerRole.none;
     try {
       await AuthService.instance.signOut();
       await EnrollmentService.instance.unpair();
-      await _storage.delete(key: _keyConfiguredRole);
+      await _storage
+          .delete(key: _keyConfiguredRole)
+          .timeout(const Duration(seconds: 2), onTimeout: () {});
     } catch (e) {
       debugPrint('Error resetting role: $e');
-    } finally {
-      currentRoleNotifier.value = FutuerRole.none;
     }
   }
 }

@@ -8,7 +8,12 @@ class InsforgeService {
   InsforgeService._();
   static final InsforgeService instance = InsforgeService._();
 
-  static const _storage = FlutterSecureStorage();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+    ),
+  );
   static const _keySavedUrl = 'insforge_saved_url';
   static const _keySavedAnonKey = 'insforge_saved_anon_key';
 
@@ -32,8 +37,12 @@ class InsforgeService {
   /// Loads stored credentials or fallback to [InsforgeConfig] and attempts initialization.
   Future<bool> initializeFromSavedOrConfig() async {
     try {
-      String? savedUrl = await _storage.read(key: _keySavedUrl);
-      String? savedKey = await _storage.read(key: _keySavedAnonKey);
+      String? savedUrl = await _storage
+          .read(key: _keySavedUrl)
+          .timeout(const Duration(seconds: 2), onTimeout: () => null);
+      String? savedKey = await _storage
+          .read(key: _keySavedAnonKey)
+          .timeout(const Duration(seconds: 2), onTimeout: () => null);
 
       final url = (savedUrl != null && savedUrl.trim().isNotEmpty)
           ? savedUrl.trim()

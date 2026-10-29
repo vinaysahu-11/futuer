@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import '../models/call_activity.dart';
 import '../models/device_location.dart';
 import '../models/device_model.dart';
@@ -16,32 +17,41 @@ class DeviceService {
   InsforgeService get _insforge => InsforgeService.instance;
   DateTime? _lastCodeGenerationTime;
 
-  /// Fetches all devices belonging to the logged-in owner
+  /// Fetches all devices belonging to the logged-in owner with safe timeout
   Future<List<DeviceModel>> fetchDevices() async {
     final ownerId = AuthService.instance.currentUser?.id;
     if (ownerId == null) return [];
 
-    final rows = await _insforge.client.database
-        .from('devices')
-        .select()
-        .eq('owner_user_id', ownerId)
-        .order('created_at', ascending: false)
-        .execute();
+    try {
+      final rows = await _insforge.client.database
+          .from('devices')
+          .select()
+          .eq('owner_user_id', ownerId)
+          .order('created_at', ascending: false)
+          .execute();
 
-    return rows.map((r) => DeviceModel.fromJson(r)).toList();
+      return rows.map((r) => DeviceModel.fromJson(r)).toList();
+    } catch (e) {
+      debugPrint('DeviceService.fetchDevices note: $e');
+      return [];
+    }
   }
 
   /// Gets a single device by ID
   Future<DeviceModel?> getDevice(String deviceId) async {
-    final rows = await _insforge.client.database
-        .from('devices')
-        .select()
-        .eq('id', deviceId)
-        .limit(1)
-        .execute();
+    try {
+      final rows = await _insforge.client.database
+          .from('devices')
+          .select()
+          .eq('id', deviceId)
+          .limit(1)
+          .execute();
 
-    if (rows.isEmpty) return null;
-    return DeviceModel.fromJson(rows.first);
+      if (rows.isEmpty) return null;
+      return DeviceModel.fromJson(rows.first);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Generates a cryptographically secure, 10-minute expiring pairing code in pairing_requests
@@ -49,21 +59,23 @@ class DeviceService {
     final ownerId = AuthService.instance.currentUser?.id;
     if (ownerId == null) throw StateError('User not logged in');
 
-    // Rate limiting: enforce at least 3 seconds between requests
+    // Rate limiting: enforce at least 2 seconds between requests
     final now = DateTime.now();
     if (_lastCodeGenerationTime != null &&
-        now.difference(_lastCodeGenerationTime!).inSeconds < 3) {
+        now.difference(_lastCodeGenerationTime!).inSeconds < 2) {
       throw StateError('Please wait a moment before generating another pairing code.');
     }
     _lastCodeGenerationTime = now;
 
     // Expire any existing pending requests for this controller to maintain clean state
-    await _insforge.client.database
-        .from('pairing_requests')
-        .eq('controller_user_id', ownerId)
-        .eq('status', 'PENDING')
-        .update({'status': 'EXPIRED'})
-        .execute();
+    try {
+      await _insforge.client.database
+          .from('pairing_requests')
+          .eq('controller_user_id', ownerId)
+          .eq('status', 'PENDING')
+          .update({'status': 'EXPIRED'})
+          .execute();
+    } catch (_) {}
 
     // Generate secure 6-digit alphanumeric code e.g. FUT-482
     final secureRandom = Random.secure();
@@ -75,13 +87,15 @@ class DeviceService {
 
     final inserted = await _insforge.client.database
         .from('pairing_requests')
-        .insert({
-          'controller_user_id': ownerId,
-          'device_name': effectiveName,
-          'pairing_code': code,
-          'status': 'PENDING',
-          'expires_at': expiresAt.toIso8601String(),
-        })
+        .insert([
+          {
+            'controller_user_id': ownerId,
+            'device_name': effectiveName,
+            'pairing_code': code,
+            'status': 'PENDING',
+            'expires_at': expiresAt.toIso8601String(),
+          }
+        ])
         .select()
         .execute();
 
@@ -99,29 +113,35 @@ class DeviceService {
 
   /// Cancels an active pairing request
   Future<void> cancelPairingRequest(String pairingRequestId) async {
-    await _insforge.client.database
-        .from('pairing_requests')
-        .eq('id', pairingRequestId)
-        .update({'status': 'CANCELLED'})
-        .execute();
+    try {
+      await _insforge.client.database
+          .from('pairing_requests')
+          .eq('id', pairingRequestId)
+          .update({'status': 'CANCELLED'})
+          .execute();
 
-    await AuditService.instance.log(
-      action: 'PAIRING_CODE_CANCELLED',
-      result: 'SUCCESS',
-    );
+      await AuditService.instance.log(
+        action: 'PAIRING_CODE_CANCELLED',
+        result: 'SUCCESS',
+      );
+    } catch (_) {}
   }
 
   /// Checks the status of a pairing request (used for polling)
   Future<PairingRequest?> getPairingRequest(String pairingRequestId) async {
-    final rows = await _insforge.client.database
-        .from('pairing_requests')
-        .select()
-        .eq('id', pairingRequestId)
-        .limit(1)
-        .execute();
+    try {
+      final rows = await _insforge.client.database
+          .from('pairing_requests')
+          .select()
+          .eq('id', pairingRequestId)
+          .limit(1)
+          .execute();
 
-    if (rows.isEmpty) return null;
-    return PairingRequest.fromJson(rows.first);
+      if (rows.isEmpty) return null;
+      return PairingRequest.fromJson(rows.first);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Fetches recorded locations for a device

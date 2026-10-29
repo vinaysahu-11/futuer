@@ -8,7 +8,12 @@ class EnrollmentService {
   EnrollmentService._();
   static final EnrollmentService instance = EnrollmentService._();
 
-  static const _storage = FlutterSecureStorage();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+    ),
+  );
   static const _keyDeviceId = 'futuer_link_device_id';
   static const _keyDeviceName = 'futuer_link_device_name';
   static const _keyOwnerId = 'futuer_link_owner_id';
@@ -34,12 +39,26 @@ class EnrollmentService {
   DateTime? _lockoutUntil;
 
   Future<bool> checkEnrollment() async {
-    _cachedDeviceId = await _storage.read(key: _keyDeviceId) ??
-        await _storage.read(key: _legacyKeyDeviceId);
-    _cachedDeviceName = await _storage.read(key: _keyDeviceName) ??
-        await _storage.read(key: _legacyKeyDeviceName);
-    _cachedOwnerId = await _storage.read(key: _keyOwnerId) ??
-        await _storage.read(key: _legacyKeyControllerId);
+    try {
+      _cachedDeviceId = await _storage
+          .read(key: _keyDeviceId)
+          .timeout(const Duration(seconds: 2), onTimeout: () => null) ??
+          await _storage
+              .read(key: _legacyKeyDeviceId)
+              .timeout(const Duration(seconds: 1), onTimeout: () => null);
+      _cachedDeviceName = await _storage
+          .read(key: _keyDeviceName)
+          .timeout(const Duration(seconds: 1), onTimeout: () => null) ??
+          await _storage
+              .read(key: _legacyKeyDeviceName)
+              .timeout(const Duration(seconds: 1), onTimeout: () => null);
+      _cachedOwnerId = await _storage
+          .read(key: _keyOwnerId)
+          .timeout(const Duration(seconds: 1), onTimeout: () => null) ??
+          await _storage
+              .read(key: _legacyKeyControllerId)
+              .timeout(const Duration(seconds: 1), onTimeout: () => null);
+    } catch (_) {}
     return _cachedDeviceId != null && _cachedDeviceId!.isNotEmpty;
   }
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../config/theme.dart';
 import '../../../models/pairing_request.dart';
-import '../../../services/auth_service.dart';
 import '../../../services/enrollment_service.dart';
 import '../permissions/link_permissions_screen.dart';
 
@@ -24,10 +23,17 @@ class _LinkPairingScreenState extends State<LinkPairingScreen> {
   }
 
   Future<void> _handleVerifyCode() async {
-    final code = _codeController.text.trim().toUpperCase();
+    String code = _codeController.text.trim().toUpperCase().replaceAll(' ', '');
     if (code.isEmpty) {
       setState(() => _errorMessage = 'Please enter the pairing code displayed on the Futuer Owner screen.');
       return;
+    }
+
+    // Auto-normalize code format (e.g. 482 -> FUT-482, fut482 -> FUT-482)
+    if (!code.contains('-') && code.startsWith('FUT') && code.length > 3) {
+      code = 'FUT-${code.substring(3)}';
+    } else if (!code.contains('-') && RegExp(r'^\d+$').hasMatch(code)) {
+      code = 'FUT-$code';
     }
 
     setState(() {
@@ -38,14 +44,6 @@ class _LinkPairingScreenState extends State<LinkPairingScreen> {
     try {
       // 1-5. Format validation, backend verification, expiration & single-use check
       final req = await EnrollmentService.instance.lookupPairingCode(code);
-
-      // Prevent Owner from enrolling their own primary account as a secondary Link device
-      final currentUserId = AuthService.instance.currentUser?.id;
-      if (currentUserId != null && currentUserId == req.controllerUserId) {
-        throw StateError(
-          'Cannot pair device: You are signed into the Owner account on this phone. An Owner manages enrolled devices and cannot enroll this phone as its own secondary Link device. Open this app on your secondary phone to pair.',
-        );
-      }
 
       if (!mounted) return;
 

@@ -9,7 +9,12 @@ class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
 
-  static const _storage = FlutterSecureStorage();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+    ),
+  );
   static const _keyPkceVerifier = 'futuer_pkce_verifier';
 
   /// Gets the InsForge client instance.
@@ -40,18 +45,27 @@ class AuthService {
   }
 
   /// Signs up a new user with email and password, auto-verifies, and signs in seamlessly.
+  /// If user already exists, transparently signs in.
   Future<AuthResponse> signUp({
     required String email,
     required String password,
     String? name,
   }) async {
     final cleanEmail = email.trim();
-    // 1. Create account
-    await _client.auth.signUp(
-      email: cleanEmail,
-      password: password,
-      name: name?.trim(),
-    );
+    try {
+      // 1. Create account
+      await _client.auth.signUp(
+        email: cleanEmail,
+        password: password,
+        name: name?.trim(),
+      );
+    } catch (e) {
+      final err = e.toString().toLowerCase();
+      // If already registered, proceed to sign in directly
+      if (!err.contains('already') && !err.contains('exists') && !err.contains('duplicate')) {
+        rethrow;
+      }
+    }
 
     // 2. Ensure email_verified = true in backend
     await autoVerifyEmail(cleanEmail);

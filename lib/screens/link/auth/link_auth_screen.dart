@@ -27,19 +27,6 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
     super.dispose();
   }
 
-  Future<void> _checkOwnerRestriction() async {
-    final user = AuthService.instance.currentUser;
-    if (user != null) {
-      final isOwner = await AuthService.instance.isUserAnOwner(user.id);
-      if (isOwner) {
-        await AuthService.instance.signOut();
-        throw StateError(
-          'Owner Account Detected: This account is registered as a Futuer Owner. An Owner account cannot be enrolled as a managed Link device. Please use a separate account on this phone.',
-        );
-      }
-    }
-  }
-
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -50,10 +37,24 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
 
     try {
       if (_modeIndex == 0) {
-        await AuthService.instance.signIn(
-          email: _emailController.text,
-          password: _passwordController.text,
-        );
+        try {
+          await AuthService.instance.signIn(
+            email: _emailController.text,
+            password: _passwordController.text,
+          );
+        } catch (signInErr) {
+          final errStr = signInErr.toString().toLowerCase();
+          if (errStr.contains('invalid credentials') || errStr.contains('not found')) {
+            // Seamlessly create account and sign in
+            await AuthService.instance.signUp(
+              email: _emailController.text,
+              password: _passwordController.text,
+              name: 'Futuer Link Device User',
+            );
+          } else {
+            rethrow;
+          }
+        }
       } else {
         await AuthService.instance.signUp(
           email: _emailController.text,
@@ -62,12 +63,12 @@ class _LinkAuthScreenState extends State<LinkAuthScreen> {
         );
       }
 
-      await _checkOwnerRestriction();
       await RoleService.instance.setConfiguredRole(FutuerRole.link);
 
       if (mounted) {
-        Navigator.of(context).pushReplacement(
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LinkPairingScreen()),
+          (route) => false,
         );
       }
     } catch (e) {

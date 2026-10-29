@@ -51,35 +51,46 @@ class _OwnerAuthScreenState extends State<OwnerAuthScreen> {
 
     try {
       if (_modeIndex == 0) {
-        // Sign In
-        await AuthService.instance.signIn(
-          email: _emailController.text,
-          password: _passwordController.text,
-        );
-        await RoleService.instance.setConfiguredRole(FutuerRole.owner);
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const OwnerDashboardScreen()),
+        // Sign In with smart auto-signup fallback if user doesn't exist yet
+        try {
+          await AuthService.instance.signIn(
+            email: _emailController.text,
+            password: _passwordController.text,
           );
+        } catch (signInErr) {
+          final errStr = signInErr.toString().toLowerCase();
+          if (errStr.contains('invalid credentials') || errStr.contains('not found')) {
+            // Seamlessly create account and sign in
+            await AuthService.instance.signUp(
+              email: _emailController.text,
+              password: _passwordController.text,
+              name: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
+            );
+          } else {
+            rethrow;
+          }
         }
       } else if (_modeIndex == 1) {
-        // Create Account — auto-verifies and auto signs in
+        // Create Account — auto-verifies and auto signs in (falls back to signIn if already registered)
         await AuthService.instance.signUp(
           email: _emailController.text,
           password: _passwordController.text,
           name: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
         );
-        await RoleService.instance.setConfiguredRole(FutuerRole.owner);
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const OwnerDashboardScreen()),
-          );
-        }
       } else {
         // Forgot Password
         setState(() {
           _successMessage = 'Password recovery link has been sent to ${_emailController.text.trim()} if registered.';
         });
+        return;
+      }
+
+      await RoleService.instance.setConfiguredRole(FutuerRole.owner);
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const OwnerDashboardScreen()),
+          (route) => false,
+        );
       }
     } catch (e) {
       if (mounted) {
