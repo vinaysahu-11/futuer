@@ -41,23 +41,20 @@ class DeviceModel {
     required this.updatedAt,
   });
 
-  /// Evaluates verified online/offline status based on last seen heartbeat within 60s
+  /// Evaluates verified online/offline status based on last seen heartbeat within 90s
   DeviceStatus get status {
     if (!isPaired) return DeviceStatus.connecting;
 
-    final hasPermWarning = permissionStatus.values.any((val) => val == false);
-
     if (lastSeenAt == null) {
-      return hasPermWarning ? DeviceStatus.permissionRequired : DeviceStatus.offline;
+      return DeviceStatus.offline;
     }
 
     final diffSeconds = DateTime.now().toUtc().difference(lastSeenAt!.toUtc()).inSeconds;
 
-    if (diffSeconds <= 60) {
-      if (hasPermWarning) return DeviceStatus.permissionRequired;
+    if (diffSeconds <= 90) {
       return DeviceStatus.online;
-    } else if (diffSeconds <= 180) {
-      return DeviceStatus.connecting;
+    } else if (diffSeconds <= 300) {
+      return DeviceStatus.lastSeen;
     } else {
       return DeviceStatus.offline;
     }

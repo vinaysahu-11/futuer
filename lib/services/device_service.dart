@@ -159,16 +159,48 @@ class DeviceService {
 
   /// Fetches latest location record for a device
   Future<DeviceLocation?> getLatestLocation(String deviceId) async {
-    final rows = await _insforge.client.database
-        .from('device_locations')
-        .select()
-        .eq('device_id', deviceId)
-        .order('recorded_at', ascending: false)
-        .limit(1)
-        .execute();
+    try {
+      final rows = await _insforge.client.database
+          .from('device_locations')
+          .select()
+          .eq('device_id', deviceId)
+          .order('recorded_at', ascending: false)
+          .limit(1)
+          .execute();
 
-    if (rows.isEmpty) return null;
-    return DeviceLocation.fromJson(rows.first);
+      if (rows.isNotEmpty) {
+        return DeviceLocation.fromJson(rows.first);
+      }
+    } catch (e) {
+      debugPrint('getLatestLocation from device_locations note: $e');
+    }
+
+    try {
+      final devRows = await _insforge.client.database
+          .from('devices')
+          .select('id, last_latitude, last_longitude, last_location_time')
+          .eq('id', deviceId)
+          .limit(1)
+          .execute();
+      if (devRows.isNotEmpty &&
+          devRows.first['last_latitude'] != null &&
+          devRows.first['last_longitude'] != null) {
+        final d = devRows.first;
+        return DeviceLocation(
+          id: 'dev-loc-${d['id']}',
+          deviceId: deviceId,
+          latitude: (d['last_latitude'] as num).toDouble(),
+          longitude: (d['last_longitude'] as num).toDouble(),
+          accuracy: 10.0,
+          recordedAt: d['last_location_time'] != null
+              ? DateTime.parse(d['last_location_time'].toString())
+              : DateTime.now().toUtc(),
+        );
+      }
+    } catch (e) {
+      debugPrint('fallback dev location note: $e');
+    }
+    return null;
   }
 
   /// Fetches recorded notifications
@@ -217,12 +249,14 @@ class DeviceService {
   }) async {
     final inserted = await _insforge.client.database
         .from('device_sessions')
-        .insert({
-          'device_id': deviceId,
-          'session_type': sessionType,
-          'status': 'REQUESTED',
-          'started_at': DateTime.now().toUtc().toIso8601String(),
-        })
+        .insert([
+          {
+            'device_id': deviceId,
+            'session_type': sessionType,
+            'status': 'REQUESTED',
+            'started_at': DateTime.now().toUtc().toIso8601String(),
+          }
+        ])
         .select()
         .execute();
 

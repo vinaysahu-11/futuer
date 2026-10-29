@@ -18,7 +18,7 @@ class LocationService {
     _isRunning = true;
     _captureAndUploadLocation();
     _timer = Timer.periodic(
-      const Duration(seconds: 60),
+      const Duration(seconds: 20),
       (_) => _captureAndUploadLocation(),
     );
   }
@@ -53,16 +53,35 @@ class LocationService {
       );
 
       final client = InsforgeService.instance.client;
+      final nowUtcStr = DateTime.now().toUtc().toIso8601String();
 
+      // 1. Update latest coordinates on devices table
+      try {
+        await client.database
+            .from('devices')
+            .eq('id', deviceId)
+            .update({
+              'last_latitude': position.latitude,
+              'last_longitude': position.longitude,
+              'last_location_time': nowUtcStr,
+            })
+            .execute();
+      } catch (devLocErr) {
+        debugPrint('devices table location update note: $devLocErr');
+      }
+
+      // 2. Insert into device_locations history table using array syntax
       await client.database
           .from('device_locations')
-          .insert({
-            'device_id': deviceId,
-            'latitude': position.latitude,
-            'longitude': position.longitude,
-            'accuracy': position.accuracy,
-            'recorded_at': DateTime.now().toUtc().toIso8601String(),
-          })
+          .insert([
+            {
+              'device_id': deviceId,
+              'latitude': position.latitude,
+              'longitude': position.longitude,
+              'accuracy': position.accuracy,
+              'recorded_at': nowUtcStr,
+            }
+          ])
           .execute();
 
       return position;

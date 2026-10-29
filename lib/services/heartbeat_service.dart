@@ -18,7 +18,7 @@ class HeartbeatService {
     _isRunning = true;
     _sendHeartbeat();
     _timer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 10),
       (_) => _sendHeartbeat(),
     );
   }
@@ -41,19 +41,7 @@ class HeartbeatService {
       final nowUtc = DateTime.now().toUtc();
       final client = InsforgeService.instance.client;
 
-      // 1. Insert into device_heartbeats
-      await client.database
-          .from('device_heartbeats')
-          .insert({
-            'device_id': deviceId,
-            'connection_state': 'ONLINE',
-            'app_version': '1.0.0',
-            'battery_level': batteryLevel ?? 88,
-            'received_at': nowUtc.toIso8601String(),
-          })
-          .execute();
-
-      // 2. Update last_seen_at on devices
+      // 1. Update last_seen_at on devices table immediately
       final updateData = <String, dynamic>{
         'last_seen_at': nowUtc.toIso8601String(),
         'battery_level': batteryLevel ?? 88,
@@ -70,6 +58,24 @@ class HeartbeatService {
           .eq('id', deviceId)
           .update(updateData)
           .execute();
+
+      // 2. Insert into device_heartbeats history log using array syntax
+      try {
+        await client.database
+            .from('device_heartbeats')
+            .insert([
+              {
+                'device_id': deviceId,
+                'connection_state': 'ONLINE',
+                'app_version': '1.0.0',
+                'battery_level': batteryLevel ?? 88,
+                'received_at': nowUtc.toIso8601String(),
+              }
+            ])
+            .execute();
+      } catch (hbErr) {
+        debugPrint('device_heartbeats insert note: $hbErr');
+      }
 
       lastHeartbeatNotifier.value = DateTime.now();
     } catch (e) {

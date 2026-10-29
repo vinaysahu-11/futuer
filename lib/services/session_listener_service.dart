@@ -19,7 +19,7 @@ class SessionListenerService {
     _isListening = true;
     _pollSessions();
     _pollTimer = Timer.periodic(
-      const Duration(seconds: 5),
+      const Duration(milliseconds: 1500),
       (_) => _pollSessions(),
     );
   }

@@ -21,14 +21,16 @@ class CallService {
 
       await client.database
           .from('call_activity')
-          .insert({
-            'device_id': deviceId,
-            'call_type': callType.toUpperCase(),
-            'phone_number': phoneNumber?.trim(),
-            'started_at': startedAt.toUtc().toIso8601String(),
-            'duration_seconds': durationSeconds,
-            'recorded_at': DateTime.now().toUtc().toIso8601String(),
-          })
+          .insert([
+            {
+              'device_id': deviceId,
+              'call_type': callType.toUpperCase(),
+              'phone_number': phoneNumber?.trim(),
+              'started_at': startedAt.toUtc().toIso8601String(),
+              'duration_seconds': durationSeconds,
+              'recorded_at': DateTime.now().toUtc().toIso8601String(),
+            }
+          ])
           .execute();
     } catch (e) {
       debugPrint('Call log upload error: $e');

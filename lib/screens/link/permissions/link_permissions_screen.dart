@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../config/theme.dart';
 import '../../../services/heartbeat_service.dart';
 import '../home/link_status_screen.dart';
@@ -12,7 +12,8 @@ class LinkPermissionsScreen extends StatefulWidget {
   State<LinkPermissionsScreen> createState() => _LinkPermissionsScreenState();
 }
 
-class _LinkPermissionsScreenState extends State<LinkPermissionsScreen> {
+class _LinkPermissionsScreenState extends State<LinkPermissionsScreen>
+    with WidgetsBindingObserver {
   bool _locationGranted = false;
   bool _notificationsGranted = false;
   bool _cameraGranted = false;
@@ -22,39 +23,84 @@ class _LinkPermissionsScreenState extends State<LinkPermissionsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _recheckAll();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _recheckAll();
+    }
   }
 
   Future<void> _recheckAll() async {
     setState(() => _isChecking = true);
-    await _checkLocation();
-    setState(() => _isChecking = false);
-  }
-
-  Future<void> _checkLocation() async {
     try {
-      final status = await Geolocator.checkPermission();
+      final loc = await Permission.location.status;
+      final cam = await Permission.camera.status;
+      final mic = await Permission.microphone.status;
+      final notif = await Permission.notification.status;
+
       if (mounted) {
         setState(() {
-          _locationGranted = status == LocationPermission.always || status == LocationPermission.whileInUse;
+          _locationGranted = loc.isGranted;
+          _cameraGranted = cam.isGranted;
+          _micGranted = mic.isGranted;
+          _notificationsGranted = notif.isGranted;
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Permission recheck error: $e');
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
   }
 
   Future<void> _requestLocation() async {
-    try {
-      final status = await Geolocator.requestPermission();
-      if (mounted) {
-        setState(() {
-          _locationGranted = status == LocationPermission.always || status == LocationPermission.whileInUse;
-        });
-      }
-    } catch (_) {}
+    final status = await Permission.location.request();
+    if (status.isPermanentlyDenied) {
+      await openAppSettings();
+    } else {
+      await _recheckAll();
+    }
+  }
+
+  Future<void> _requestCamera() async {
+    final status = await Permission.camera.request();
+    if (status.isPermanentlyDenied) {
+      await openAppSettings();
+    } else {
+      await _recheckAll();
+    }
+  }
+
+  Future<void> _requestMicrophone() async {
+    final status = await Permission.microphone.request();
+    if (status.isPermanentlyDenied) {
+      await openAppSettings();
+    } else {
+      await _recheckAll();
+    }
+  }
+
+  Future<void> _requestNotifications() async {
+    final status = await Permission.notification.request();
+    if (status.isPermanentlyDenied) {
+      await openAppSettings();
+    } else {
+      await _recheckAll();
+    }
   }
 
   void _finishSetup() {
-    // Report permissions to backend via heartbeat
+    // Report permissions to backend via heartbeat immediately
     HeartbeatService.instance.triggerHeartbeat(
       permissions: {
         'location': _locationGranted,
@@ -106,7 +152,7 @@ class _LinkPermissionsScreenState extends State<LinkPermissionsScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Grant the required permissions below for Futuer Link telemetry and remote management.',
+              'Grant the required permissions below for Futuer Link telemetry, live camera, and remote management.',
               style: TextStyle(
                 fontSize: 13,
                 color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -124,41 +170,46 @@ class _LinkPermissionsScreenState extends State<LinkPermissionsScreen> {
             ),
             const SizedBox(height: 12),
 
-            // 2. Notifications
-            _PermissionTile(
-              title: 'Notification Listener',
-              description: 'Enables real-time notification forwarding to your Futuer Owner.',
-              icon: Icons.notifications_active_outlined,
-              isGranted: _notificationsGranted,
-              onRequest: () {
-                setState(() => _notificationsGranted = !_notificationsGranted);
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // 3. Camera
+            // 2. Camera
             _PermissionTile(
               title: 'Camera Access',
               description: 'Required for authorized live camera sessions with prominent privacy indicator.',
               icon: Icons.videocam_outlined,
               isGranted: _cameraGranted,
-              onRequest: () {
-                setState(() => _cameraGranted = !_cameraGranted);
-              },
+              onRequest: _requestCamera,
             ),
             const SizedBox(height: 12),
 
-            // 4. Microphone
+            // 3. Microphone
             _PermissionTile(
               title: 'Microphone Access',
               description: 'Required for authorized real-time audio streams with visible session badge.',
               icon: Icons.mic_none_outlined,
               isGranted: _micGranted,
-              onRequest: () {
-                setState(() => _micGranted = !_micGranted);
-              },
+              onRequest: _requestMicrophone,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 12),
+
+            // 4. Notifications
+            _PermissionTile(
+              title: 'Notification Access',
+              description: 'Enables real-time notifications and background connection status.',
+              icon: Icons.notifications_active_outlined,
+              isGranted: _notificationsGranted,
+              onRequest: _requestNotifications,
+            ),
+            const SizedBox(height: 20),
+
+            // Settings fallback
+            OutlinedButton.icon(
+              onPressed: () => openAppSettings(),
+              icon: const Icon(Icons.settings_outlined, size: 18),
+              label: const Text('Open Android App Settings (if blocked)'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 24),
 
             FilledButton(
               style: FilledButton.styleFrom(
@@ -222,24 +273,27 @@ class _PermissionTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: (isGranted ? Colors.green : Colors.grey).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  isGranted ? 'GRANTED' : 'OPTIONAL / PENDING',
-                  style: TextStyle(
-                    fontSize: 10,
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: isGranted ? Colors.green : Colors.grey,
                   ),
                 ),
               ),
+              if (isGranted)
+                const Chip(
+                  avatar: Icon(Icons.check, size: 14, color: Colors.green),
+                  label: Text('Granted', style: TextStyle(color: Colors.green, fontSize: 12)),
+                  backgroundColor: Colors.transparent,
+                  side: BorderSide(color: Colors.green),
+                  visualDensity: VisualDensity.compact,
+                )
+              else
+                FilledButton.tonal(
+                  onPressed: onRequest,
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: const Text('Turn On'),
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -248,21 +302,8 @@ class _PermissionTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 12.5,
               color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              height: 1.35,
             ),
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: isGranted
-                ? const SizedBox.shrink()
-                : FilledButton(
-                    style: FilledButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      backgroundColor: FutuerTheme.brandPrimary,
-                    ),
-                    onPressed: onRequest,
-                    child: const Text('Grant Access', style: TextStyle(fontSize: 12)),
-                  ),
           ),
         ],
       ),

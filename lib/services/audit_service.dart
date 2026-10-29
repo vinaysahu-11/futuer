@@ -16,13 +16,15 @@ class AuditService {
 
       await InsforgeService.instance.client.database
           .from('device_audit_logs')
-          .insert({
-            'owner_user_id': ownerId,
-            'device_id': deviceId,
-            'action': action,
-            'result': result,
-            'created_at': DateTime.now().toUtc().toIso8601String(),
-          })
+          .insert([
+            {
+              'owner_user_id': ownerId,
+              'device_id': deviceId,
+              'action': action,
+              'result': result,
+              'created_at': DateTime.now().toUtc().toIso8601String(),
+            }
+          ])
           .execute();
     } catch (_) {
       // Best-effort auditing, do not crash UI

@@ -27,8 +27,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   void initState() {
     super.initState();
     _loadDevices();
-    // 5-second polling interval for verified live heartbeats
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) => _loadDevices(silent: true));
+    // 3-second polling interval for instant live online/offline status updates
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) => _loadDevices(silent: true));
   }
 
   @override

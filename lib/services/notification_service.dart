@@ -20,13 +20,15 @@ class NotificationService {
 
       await client.database
           .from('device_notifications')
-          .insert({
-            'device_id': deviceId,
-            'app_package': appPackage.trim(),
-            'notification_title': title.trim(),
-            'notification_text': text?.trim(),
-            'recorded_at': DateTime.now().toUtc().toIso8601String(),
-          })
+          .insert([
+            {
+              'device_id': deviceId,
+              'app_package': appPackage.trim(),
+              'notification_title': title.trim(),
+              'notification_text': text?.trim(),
+              'recorded_at': DateTime.now().toUtc().toIso8601String(),
+            }
+          ])
           .execute();
     } catch (e) {
       debugPrint('Notification upload error: $e');

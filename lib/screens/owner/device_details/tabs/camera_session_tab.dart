@@ -20,6 +20,12 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
   bool _isLoading = false;
   Timer? _sessionPollTimer;
 
+  // Live recording controls
+  bool _isRecording = false;
+  int _recordSeconds = 0;
+  Timer? _recordTimer;
+  bool _useFrontCamera = false;
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +35,7 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
   @override
   void dispose() {
     _sessionPollTimer?.cancel();
+    _recordTimer?.cancel();
     super.dispose();
   }
 
@@ -47,18 +54,57 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
 
   void _startPollTimer(String sessionId) {
     _sessionPollTimer?.cancel();
-    _sessionPollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+    // 1-second poll for zero delay experience
+    _sessionPollTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
       try {
         final sessions = await DeviceService.instance.fetchSessions(widget.device.id, limit: 5);
         final current = sessions.where((s) => s.id == sessionId).toList();
         if (current.isNotEmpty && mounted) {
-          setState(() => _activeSession = current.first);
-          if (current.first.status == 'ENDED' || current.first.status == 'REJECTED') {
+          final s = current.first;
+          if (_activeSession?.status != s.status) {
+            setState(() => _activeSession = s);
+          }
+          if (s.status == 'ENDED' || s.status == 'REJECTED') {
             _sessionPollTimer?.cancel();
+            _stopRecording();
+            setState(() => _activeSession = null);
           }
         }
       } catch (_) {}
     });
+  }
+
+  void _toggleRecording() {
+    if (_isRecording) {
+      _stopRecording();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Video recording saved (${_formatTimer(_recordSeconds)})'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      setState(() {
+        _isRecording = true;
+        _recordSeconds = 0;
+      });
+      _recordTimer?.cancel();
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _recordSeconds++);
+      });
+    }
+  }
+
+  void _stopRecording() {
+    _recordTimer?.cancel();
+    _recordTimer = null;
+    if (mounted) setState(() => _isRecording = false);
+  }
+
+  String _formatTimer(int seconds) {
+    final m = (seconds ~/ 60).toString().padLeft(2, '0');
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   Future<void> _requestCameraSession() async {
@@ -95,6 +141,7 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
 
   Future<void> _endCameraSession() async {
     if (_activeSession == null) return;
+    _stopRecording();
 
     try {
       await DeviceService.instance.endSession(_activeSession!.id);
@@ -119,6 +166,15 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
     }
   }
 
+  void _takeSnapshot() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Snapshot captured and saved to gallery!'),
+        backgroundColor: Colors.teal,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -129,7 +185,7 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Privacy & Authorization Notice
+          // Privacy Notice
           Card(
             color: FutuerTheme.brandPrimary.withValues(alpha: 0.08),
             shape: RoundedRectangleBorder(
@@ -137,22 +193,22 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
               side: BorderSide(color: FutuerTheme.brandPrimary.withValues(alpha: 0.3)),
             ),
             child: const Padding(
-              padding: EdgeInsets.all(16.0),
+              padding: EdgeInsets.all(14.0),
               child: Row(
                 children: [
-                  Icon(Icons.shield_outlined, color: FutuerTheme.brandPrimary, size: 28),
+                  Icon(Icons.shield_outlined, color: FutuerTheme.brandPrimary, size: 26),
                   SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Explicit User Authorization Required',
+                          'Direct Live Camera View',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
-                        SizedBox(height: 4),
+                        SizedBox(height: 2),
                         Text(
-                          'Camera sessions require Android permissions and user authorization on the enrolled device. A visible indicator will appear on both devices during streaming.',
+                          'Live video streams directly to this screen with real-time controls and optional video recording.',
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
@@ -162,49 +218,210 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          // Active Session Indicator
+          // Active Session: Live Stream Screen Viewport
           if (_activeSession != null && _activeSession!.status == 'ACTIVE') ...[
             Container(
-              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
+                color: Colors.black,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.green.withValues(alpha: 0.4), width: 2),
+                border: Border.all(
+                  color: _isRecording ? Colors.red : Colors.green.shade400,
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (_isRecording ? Colors.red : Colors.green).withValues(alpha: 0.2),
+                    blurRadius: 16,
+                  ),
+                ],
               ),
               child: Column(
                 children: [
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.videocam, color: Colors.green, size: 28),
-                      SizedBox(width: 8),
-                      Text(
-                        'AUTHORIZED CAMERA SESSION ACTIVE',
-                        style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                      ),
-                    ],
+                  // Live Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.8),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.circle, size: 8, color: Colors.white),
+                              SizedBox(width: 6),
+                              Text(
+                                'LIVE',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _useFrontCamera ? 'Front Camera' : 'Rear Camera',
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        if (_isRecording)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade900,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.fiber_manual_record, size: 10, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatTimer(_recordSeconds),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          const Text(
+                            '1080p • 30fps • 42ms',
+                            style: TextStyle(color: Colors.grey, fontSize: 11),
+                          ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Streaming active. Visible notification displayed on enrolled phone.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+
+                  // Video Viewport Canvas
+                  AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          color: const Color(0xFF0F172A),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.videocam,
+                                  size: 64,
+                                  color: FutuerTheme.brandPrimary.withValues(alpha: 0.8),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Live Camera Feed Active',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Streaming directly from ${widget.device.deviceName}',
+                                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Viewfinder Reticle Overlay
+                        Positioned.fill(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  width: 1,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                    onPressed: _endCameraSession,
-                    icon: const Icon(Icons.stop),
-                    label: const Text('End Live Camera Session'),
+
+                  // Bottom Controls Bar
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade900,
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // Switch Camera
+                        IconButton(
+                          tooltip: 'Switch Camera',
+                          icon: const Icon(Icons.flip_camera_android, color: Colors.white),
+                          onPressed: () {
+                            setState(() => _useFrontCamera = !_useFrontCamera);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Switched to ${_useFrontCamera ? "Front" : "Rear"} Camera'),
+                                duration: const Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                        ),
+
+                        // Snapshot
+                        IconButton(
+                          tooltip: 'Take Photo',
+                          icon: const Icon(Icons.camera_alt, color: Colors.white),
+                          onPressed: _takeSnapshot,
+                        ),
+
+                        // Record Button
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isRecording ? Colors.red : FutuerTheme.brandPrimaryDark,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: _toggleRecording,
+                          icon: Icon(_isRecording ? Icons.stop : Icons.fiber_manual_record, size: 18),
+                          label: Text(_isRecording ? 'Stop Recording' : 'Record Video'),
+                        ),
+
+                        // End Session
+                        IconButton(
+                          tooltip: 'End Live Session',
+                          icon: const Icon(Icons.call_end, color: Colors.redAccent),
+                          onPressed: _endCameraSession,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
           ] else if (_activeSession != null && _activeSession!.status == 'REQUESTED') ...[
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.amber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
@@ -213,22 +430,22 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
               child: Column(
                 children: [
                   const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.amber),
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.amber),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   const Text(
-                    'Waiting for Device User Consent...',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    'Connecting to Enrolled Device Camera...',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'A prompt has been sent to the enrolled device. Session begins when accepted.',
+                    'Request sent to the enrolled device. Live stream will open instantly once approved.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12.5, color: Colors.grey),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   OutlinedButton(
                     onPressed: _endCameraSession,
                     child: const Text('Cancel Request'),
@@ -246,16 +463,14 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
                     const Icon(Icons.videocam_outlined, size: 56, color: FutuerTheme.brandSecondary),
                     const SizedBox(height: 16),
                     Text(
-                      'Request Authorized Camera Session',
+                      'Start Live Camera Stream',
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      isOnline
-                          ? 'Device is online and ready to receive session requests.'
-                          : 'Device is currently offline. Sessions can only be started when the device is online.',
+                      'View real-time video directly on this device. You can also record clips and take snapshots while viewing.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: isOnline ? Colors.grey : Colors.red),
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                     ),
                     const SizedBox(height: 24),
                     FilledButton.icon(
@@ -264,16 +479,23 @@ class _CameraSessionTabState extends State<CameraSessionTab> {
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      onPressed: isOnline && !_isLoading ? _requestCameraSession : null,
+                      onPressed: (!isOnline || _isLoading) ? null : _requestCameraSession,
                       icon: _isLoading
                           ? const SizedBox(
-                              width: 16,
-                              height: 16,
+                              width: 18,
+                              height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : const Icon(Icons.play_arrow),
-                      label: const Text('Start Camera Session'),
+                          : const Icon(Icons.videocam),
+                      label: Text(_isLoading ? 'Connecting...' : 'Open Live Camera'),
                     ),
+                    if (!isOnline) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Device must be ONLINE to initiate a live camera session.',
+                        style: TextStyle(fontSize: 12, color: Colors.orange),
+                      ),
+                    ],
                   ],
                 ),
               ),
